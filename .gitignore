@@ -1,0 +1,51 @@
+#  Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+.eggs/
+
+# Environnements virtuels
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Logs applicatifs
+*.log
+logs/
+app.log
+
+# Rapports et exports
+*.html
+*.csv
+coverage.xml
+.coverage
+htmlcov/
+
+# IDE 
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Docker ─
+.dockerignore
+
+#OS
+.DS_Store
+Thumbs.db
+
+# Streamlit
+.streamlit/

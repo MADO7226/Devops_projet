@@ -1,0 +1,136 @@
+name: CI/CD Pipeline - Titanic Dashboard
+
+on:
+  push:
+    branches: [ "main", "dev", "feature/**" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  IMAGE_NAME: titanic-dashboard
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  lint-and-test:
+    name: "Lint & Tests"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Installation des dépendances
+        run: pip install -r requirements.txt
+
+      - name: Linter flake8
+        run: |
+          # Arrêt si erreurs critiques (E, F) — warnings (W) tolérés
+          flake8 app.py data/ tests/ \
+            --max-line-length=100 \
+            --select=E,F \
+            --exclude=__pycache__,.git
+
+      - name: Tests unitaires pytest
+        run: |
+          pytest tests/ -v \
+            --tb=short \
+            --cov=data \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml
+
+      - name: Upload couverture de code
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+  generate-report:
+    name: "Rapport Profiling"
+    runs-on: ubuntu-latest
+    needs: lint-and-test   
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Installation dépendances
+        run: pip install -r requirements.txt
+
+      - name: Génération du rapport HTML
+        run: |
+          python - <<'EOF'
+          import seaborn as sns
+          from ydata_profiling import ProfileReport
+          from data.loader import load_titanic
+
+          df = load_titanic()
+          profile = ProfileReport(df, title="Titanic Dataset - Rapport d'analyse",
+                                  explorative=True)
+          profile.to_file("titanic-report-v1.0.html")
+          print("Rapport généré : titanic-report-v1.0.html")
+          EOF
+
+      - name: Upload rapport dans GitHub Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: titanic-report-v1.0
+          path: titanic-report-v1.0.html
+          retention-days: 30
+
+      - name: Upload rapport vers Nexus
+        if: ${{ secrets.NEXUS_URL != '' }}
+        run: |
+          curl -u "${{ secrets.NEXUS_USER }}:${{ secrets.NEXUS_PASSWORD }}" \
+            --upload-file titanic-report-v1.0.html \
+            "${{ secrets.NEXUS_URL }}/repository/titanic-reports/titanic-report-v1.0.html"
+
+  docker-build-push:
+    name: "Docker Build & Push"
+    runs-on: ubuntu-latest
+    needs: lint-and-test  
+    if: github.ref == 'refs/heads/main'  
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build et Push image Docker
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:v1.0
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+  deploy:
+    name: "Déploiement"
+    runs-on: ubuntu-latest
+    needs: docker-build-push
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Déploiement via docker-compose
+        run: |
+          echo "Image ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }} prête"
+          echo "docker-compose pull && docker-compose up -d"
+          # En production, utiliser une action SSH vers votre serveur :
+          # ssh user@server "cd /app && docker-compose pull && docker-compose up -d"
