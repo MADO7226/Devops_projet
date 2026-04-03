@@ -88,11 +88,11 @@ jobs:
           retention-days: 30
 
       - name: Upload rapport vers Nexus
-        if: ${{ secrets.NEXUS_URL != '' }}
+        if: ${{ secret.NEXUS_URL != '' }}
         run: |
-          curl -u "${{ secrets.NEXUS_USER }}:${{ secrets.NEXUS_PASSWORD }}" \
+          curl -u "${{ secret.NEXUS_USER }}:${{ secret.NEXUS_PASSWORD }}" \
             --upload-file titanic-report-v1.0.html \
-            "${{ secrets.NEXUS_URL }}/repository/titanic-reports/titanic-report-v1.0.html"
+            "${{ secret.NEXUS_URL }}/repository/titanic-reports/titanic-report-v1.0.html"
 
   docker-build-push:
     name: "Docker Build & Push"
