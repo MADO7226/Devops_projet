@@ -88,7 +88,7 @@ jobs:
           retention-days: 30
 
       - name: Upload rapport vers Nexus
-        if: ${{ secrets.NEXUS_URL != '' }}
+        if: ${{ NEXUS_URL != '' }}
         run: |
           curl -u "${{ secrets.NEXUS_USER }}:${{ secrets.NEXUS_PASSWORD }}" \
             --upload-file titanic-report-v1.0.html \
